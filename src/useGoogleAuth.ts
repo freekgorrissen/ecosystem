@@ -12,20 +12,7 @@ type GoogleTokenClient = {
 };
 
 export function useGoogleAuth({ setUser, setAccessToken }: UseGoogleAuthOptions) {
-  // Use number for browser timer
-  const refreshTimer = useRef<number | null>(null);
   const tokenClientRef = useRef<GoogleTokenClient | null>(null);
-
-  // Helper to schedule token refresh
-  const scheduleTokenRefresh = (expiresIn: number) => {
-    if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
-    // Refresh 1 minute before expiry
-    refreshTimer.current = window.setTimeout(() => {
-      if (tokenClientRef.current) {
-        tokenClientRef.current.requestAccessToken({ prompt: "" });
-      }
-    }, (expiresIn - 60) * 1000);
-  };
 
   // Setup Google login
   const login = useGoogleLogin({
@@ -36,7 +23,6 @@ export function useGoogleAuth({ setUser, setAccessToken }: UseGoogleAuthOptions)
         // Store expiry time
         if (tokenResponse.expires_in) {
           localStorage.setItem("accessTokenExpiresAt", (Date.now() + tokenResponse.expires_in * 1000).toString());
-          scheduleTokenRefresh(tokenResponse.expires_in);
         }
         // Fetch user info with access_token
         fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
@@ -70,24 +56,21 @@ export function useGoogleAuth({ setUser, setAccessToken }: UseGoogleAuthOptions)
             localStorage.setItem("accessToken", tokenResponse.access_token);
             if (tokenResponse.expires_in) {
               localStorage.setItem("accessTokenExpiresAt", (Date.now() + tokenResponse.expires_in * 1000).toString());
-              scheduleTokenRefresh(tokenResponse.expires_in);
             }
           }
         },
       });
     }
-    return () => {
-      if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
-    };
   }, [setAccessToken]);
 
-  // On mount, if accessToken exists and is not expired, schedule refresh
+  // On mount, check if token is expired and refresh if needed
   useEffect(() => {
     const expiresAt = localStorage.getItem("accessTokenExpiresAt");
     if (expiresAt) {
       const msLeft = parseInt(expiresAt) - Date.now();
-      if (msLeft > 0) {
-        scheduleTokenRefresh(msLeft / 1000);
+      if (msLeft <= 0 && tokenClientRef.current) {
+        // Token is expired, refresh it immediately
+        tokenClientRef.current.requestAccessToken({ prompt: '' });
       }
     }
   }, []);

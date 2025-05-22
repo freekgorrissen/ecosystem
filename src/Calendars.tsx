@@ -8,6 +8,8 @@ import bootstrap5Plugin from "@fullcalendar/bootstrap5";
 import 'bootstrap/dist/css/bootstrap.css';
 import '~bootstrap-icons/font/bootstrap-icons.css';
 import EventAlert from "./EventAlert";
+import calendarAlerts from "./CalendarAlerts.ts";
+import type { CalendarAlert } from "./CalendarAlerts.ts";
 
 interface CalendarList {
   id: string;
@@ -26,6 +28,7 @@ export interface CalendarEvent {
 
 interface CalendarsProps {
   accessToken: string;
+  setAccessToken: (token: string | null) => void;
 }
 
 const ECOSYSTEM_CALENDAR_ID = import.meta.env.VITE_CALENDAR_ECOSYSTEM_ID;
@@ -37,7 +40,7 @@ interface EventClickInfo {
   jsEvent: MouseEvent;
 }
 
-const Calendars: React.FC<CalendarsProps> = ({ accessToken }) => {
+const Calendars: React.FC<CalendarsProps> = ({ accessToken, setAccessToken }) => {
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -45,63 +48,128 @@ const Calendars: React.FC<CalendarsProps> = ({ accessToken }) => {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
 
+  const fetchCalendarData = async (token: string, retryCount = 0): Promise<void> => {
+    try {
+      // Fetch all user calendars
+      const calendarResponse = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!calendarResponse.ok) {
+        if (calendarResponse.status === 401 && retryCount === 0) {
+          // Token expired, request a new one
+          // @ts-expect-error: google.accounts.oauth2 may not be typed
+          if (window.google?.accounts?.oauth2) {
+            // @ts-expect-error: google.accounts.oauth2 may not be typed
+            const tokenClient = window.google.accounts.oauth2.initTokenClient({
+              client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+              scope: "openid email profile https://www.googleapis.com/auth/calendar.readonly",
+              callback: async (tokenResponse: { access_token: string; expires_in: number }) => {
+                if (tokenResponse.access_token) {
+                  setAccessToken(tokenResponse.access_token);
+                  localStorage.setItem("accessToken", tokenResponse.access_token);
+                  if (tokenResponse.expires_in) {
+                    localStorage.setItem("accessTokenExpiresAt", (Date.now() + tokenResponse.expires_in * 1000).toString());
+                  }
+                  // Retry with new token
+                  await fetchCalendarData(tokenResponse.access_token, retryCount + 1);
+                }
+              },
+            });
+            tokenClient.requestAccessToken({ prompt: '' });
+            return;
+          }
+        }
+        throw new Error("Failed to fetch calendars");
+      }
+
+      const calendarData = await calendarResponse.json();
+      
+      // Exclude calendars with names containing Forecast, Weather, Tasks, or Project
+      const calendars: CalendarList[] = (calendarData.items || []).filter(
+        (cal: CalendarList) => !/forecast|weather|tasks|project/i.test(cal.summary)
+      );
+      setHasAccess(calendars.some((cal) => cal.id === ECOSYSTEM_CALENDAR_ID));
+      
+      // Fetch events from all included calendars
+      const now = new Date();
+      const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+      const allEvents: CalendarEvent[] = [];
+      
+      await Promise.all(
+        calendars.map(async (cal) => {
+          try {
+            const eventResponse = await fetch(
+              `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+                cal.id
+              )}/events?&orderBy=startTime&singleEvents=true&timeMin=${encodeURIComponent(
+                startOfPrevMonth.toISOString()
+              )}&timeMax=${encodeURIComponent(endOfNextMonth.toISOString())}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+
+            if (!eventResponse.ok) {
+              if (eventResponse.status === 401 && retryCount === 0) {
+                // Token expired, request a new one
+                // @ts-expect-error: google.accounts.oauth2 may not be typed
+                if (window.google?.accounts?.oauth2) {
+                  // @ts-expect-error: google.accounts.oauth2 may not be typed
+                  const tokenClient = window.google.accounts.oauth2.initTokenClient({
+                    client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+                    scope: "openid email profile https://www.googleapis.com/auth/calendar.readonly",
+                    callback: async (tokenResponse: { access_token: string; expires_in: number }) => {
+                      if (tokenResponse.access_token) {
+                        setAccessToken(tokenResponse.access_token);
+                        localStorage.setItem("accessToken", tokenResponse.access_token);
+                        if (tokenResponse.expires_in) {
+                          localStorage.setItem("accessTokenExpiresAt", (Date.now() + tokenResponse.expires_in * 1000).toString());
+                        }
+                        // Retry with new token
+                        await fetchCalendarData(tokenResponse.access_token, retryCount + 1);
+                      }
+                    },
+                  });
+                  tokenClient.requestAccessToken({ prompt: '' });
+                  return;
+                }
+              }
+              return;
+            }
+
+            const eventData = await eventResponse.json();
+            if (eventData.items) {
+              allEvents.push(...eventData.items.map((item: CalendarEvent) => ({
+                ...item,
+                color: cal.backgroundColor,
+                calendarName: cal.summary
+              })));
+            }
+          } catch {
+            // Ignore errors for individual calendars
+          }
+        })
+      );
+      
+      setEvents(allEvents);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!accessToken) return;
     setLoading(true);
-    // Fetch all user calendars
-    fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch calendars");
-        return res.json();
-      })
-      .then(async (data) => {
-        // Exclude calendars with names containing Forecast, Weather, or Tasks
-        const calendars: CalendarList[] = (data.items || []).filter(
-          (cal: CalendarList) => !/forecast|weather|tasks|project/i.test(cal.summary)
-        );
-        setHasAccess(calendars.some((cal) => cal.id === ECOSYSTEM_CALENDAR_ID));
-        
-        // Fetch events from all included calendars
-        const now = new Date();
-        const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0);
-        const allEvents: CalendarEvent[] = [];
-        
-        await Promise.all(
-          calendars.map(async (cal) => {
-            try {
-              const res = await fetch(
-                `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
-                  cal.id
-                )}/events?&orderBy=startTime&singleEvents=true&timeMin=${encodeURIComponent(
-                  startOfPrevMonth.toISOString()
-                )}&timeMax=${encodeURIComponent(endOfNextMonth.toISOString())}`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                  },
-                }
-              );
-              if (!res.ok) return;
-              const data = await res.json();
-              if (data.items) allEvents.push(...data.items.map((item: CalendarEvent) => ({...item, color: cal.backgroundColor, calendarName: cal.summary})));
-            } catch {
-              // Ignore errors for individual calendars
-            }
-          })
-        );
-        setEvents(allEvents);
-        setError(null);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
+    fetchCalendarData(accessToken);
   }, [accessToken]);
 
   const formatEventTime = (event: CalendarEvent) => {
@@ -184,25 +252,15 @@ const Calendars: React.FC<CalendarsProps> = ({ accessToken }) => {
 
   return (
     <Box>
-      <EventAlert
-        events={events}
-        keyword="Blaf en Blij gesloten"
-        severity="warning"
-      >
-        Blaf en Blij is vandaag gesloten
-      </EventAlert>
-      <EventAlert
-        events={events}
-        keyword="Maya kinderdagverblijf"
-        severity="info"
-      >
-        Maya gaat vandaag naar Onder de Boompjes 🌳
-      </EventAlert>
-
-      <EventAlert events={events} keyword="Birthday" severity="success">
-        🥳 Er is vandaag een jarige! 🥳
-      </EventAlert>
-
+      {calendarAlerts.map((alert: CalendarAlert) => (
+        <EventAlert
+          events={events}
+          keyword={alert.keyword}
+          severity={alert.severity}
+        >
+          {alert.message}
+        </EventAlert>
+      ))}
       <Box sx={{ mt: 4 }}>
         <FullCalendar
           plugins={[

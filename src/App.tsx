@@ -53,7 +53,7 @@ function App() {
           />
           <Container>
             <main style={{ width: "100%", boxSizing: "border-box", marginTop: "80px", flex: 1 }}>
-              {user && accessToken && <Calendars accessToken={accessToken} />}
+              {user && accessToken && <Calendars accessToken={accessToken} setAccessToken={handleSetAccessToken} />}
             </main>
           </Container>
         </div>
