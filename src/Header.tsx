@@ -1,5 +1,19 @@
-import { useRef, useState, useEffect } from "react";
+import { useState } from "react";
 import { useGoogleAuth } from "./useGoogleAuth";
+import { 
+  AppBar, 
+  Toolbar, 
+  Typography, 
+  Button, 
+  Avatar, 
+  Menu, 
+  MenuItem, 
+  Box,
+  useTheme,
+  useMediaQuery
+} from "@mui/material";
+import { Google as GoogleIcon } from '@mui/icons-material';
+import nata from "/nata_resize.jpg";
 
 interface UserInfoType {
   picture?: string;
@@ -14,24 +28,9 @@ interface HeaderProps {
 
 const Header = ({ user, setUser, setAccessToken }: HeaderProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown if clicked outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    if (menuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    } else {
-      document.removeEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [menuOpen]);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // Extract user name (try name, fallback to email, else unknown)
   const userName = user?.name || user?.email || "Unknown";
@@ -39,111 +38,105 @@ const Header = ({ user, setUser, setAccessToken }: HeaderProps) => {
   // useGoogleLogin for implicit flow
   const login = useGoogleAuth({ setUser, setAccessToken });
 
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+    setMenuOpen(true);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setMenuOpen(false);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setAccessToken(null);
+    handleMenuClose();
+  };
+
   return (
-    <header
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "1rem 2rem",
-        background: "teal",
-        width: "100vw",
-        boxSizing: "border-box",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        zIndex: 1000,
+    <AppBar 
+      position="fixed" 
+      sx={{ 
+        bgcolor: 'teal',
+        boxShadow: 1
       }}
     >
-      <span
-        style={{
-          fontWeight: "bold",
-          fontSize: "1.5rem",
-          color: "black",
-        }}
-      >
-        EcoSystem
-      </span>
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-        {!user && (
-          <button
-            onClick={() => login()}
-            style={{
-              padding: "0.5rem 1rem",
-              fontSize: "1rem",
-              borderRadius: 4,
-              border: "none",
-              background: "#fff",
-              color: "teal",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
-            Login with Google
-          </button>
-        )}
-        {user && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              position: "relative",
-            }}
-            ref={menuRef}
-          >
-            <span style={{ fontSize: "1rem", color: "black" }}>{`Ingelogd als ${userName}`}</span>
-            <img
-              src={user.picture as string}
-              alt="User"
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                objectFit: "cover",
-                cursor: "pointer",
+      <Toolbar>
+        <Box
+          component="img"
+          src={nata}
+          alt="Nata"
+          sx={{
+            height: '60px',
+            mr: 2
+          }}
+        />
+        <Typography
+          variant="h6"
+          component="div"
+          sx={{ 
+            flexGrow: 1,
+            fontWeight: 'bold',
+            color: 'black'
+          }}
+        >
+          Ecosystem Planner
+        </Typography>
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {!user ? (
+            <Button
+              variant="contained"
+              onClick={() => login()}
+              startIcon={<GoogleIcon />}
+              sx={{
+                bgcolor: 'white',
+                color: 'teal',
+                '&:hover': {
+                  bgcolor: 'grey.100'
+                }
               }}
-              onClick={() => setMenuOpen((open) => !open)}
-            />
-            {menuOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: 50,
-                  right: 0,
-                  background: "#fff",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                  borderRadius: 6,
-                  minWidth: 120,
-                  zIndex: 2000,
-                  padding: "0.5rem 0",
+            >
+              Login with Google
+            </Button>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {!isMobile && (
+                <Typography variant="body1" color="black">
+                  {`Ingelogd als ${userName}`}
+                </Typography>
+              )}
+              <Avatar
+                src={user.picture as string}
+                alt="User"
+                onClick={handleMenuClick}
+                sx={{ 
+                  cursor: 'pointer',
+                  width: 40,
+                  height: 40
+                }}
+              />
+              <Menu
+                anchorEl={anchorEl}
+                open={menuOpen}
+                onClose={handleMenuClose}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'right',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
                 }}
               >
-                <button
-                  style={{
-                    width: "100%",
-                    background: "none",
-                    border: "none",
-                    padding: "0.5rem 1rem",
-                    textAlign: "left",
-                    cursor: "pointer",
-                    fontSize: "1rem",
-                    color: "black",
-                  }}
-                  onClick={() => {
-                    setUser(null);
-                    setAccessToken(null); // Clear access token on logout
-                    setMenuOpen(false);
-                  }}
-                >
-                  Log out
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </header>
+                <MenuItem onClick={handleLogout}>Log out</MenuItem>
+              </Menu>
+            </Box>
+          )}
+        </Box>
+      </Toolbar>
+    </AppBar>
   );
 };
 

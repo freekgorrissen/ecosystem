@@ -1,5 +1,5 @@
 import Alert from "@mui/material/Alert";
-import type { CalendarEvent } from "./Calendar";
+import type { CalendarEvent } from "./Calendars";
 import type { AlertColor } from "@mui/material/Alert";
 
 interface EventAlertProps {
