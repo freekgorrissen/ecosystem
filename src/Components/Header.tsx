@@ -13,7 +13,7 @@ import {
   useMediaQuery
 } from "@mui/material";
 import { Google as GoogleIcon } from '@mui/icons-material';
-
+import nata from "/nata_resize.jpg";
 
 interface UserInfoType {
   picture?: string;
@@ -33,7 +33,7 @@ const Header = ({ user, setUser, setAccessToken }: HeaderProps) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // Extract user name (try name, fallback to email, else unknown)
-  const userName = (user?.name as string) ?? (user?.email as string) ?? "Unknown";
+  const userName = user?.name || user?.email || "Unknown";
 
   // useGoogleLogin for implicit flow
   const login = useGoogleAuth({ setUser, setAccessToken });
@@ -63,15 +63,15 @@ const Header = ({ user, setUser, setAccessToken }: HeaderProps) => {
       }}
     >
       <Toolbar>
-        {/* <Box
+        <Box
           component="img"
-          src="./nata_resize.jpg"
+          src={nata}
           alt="Nata"
           sx={{
             height: '60px',
             mr: 2
           }}
-        /> */}
+        />
         <Typography
           variant="h6"
           component="div"

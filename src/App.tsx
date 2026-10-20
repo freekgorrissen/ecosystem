@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { ThemeProvider, useMediaQuery, CssBaseline } from "@mui/material";
-import Header from "./Header";
-import Calendars from "./Calendars";
+import Header from "./Components/Header";
+import Calendars from "./Components/Calendars";
 import { Container } from "@mui/material";
 import { createAppTheme } from './theme';
 
