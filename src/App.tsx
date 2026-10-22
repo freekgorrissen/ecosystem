@@ -3,8 +3,11 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import { ThemeProvider, useMediaQuery, CssBaseline } from "@mui/material";
 import Header from "./Components/Header";
 import Calendars from "./Components/Calendars";
-import { Container } from "@mui/material";
+import Commute from "./Components/Commute";
+import Sidebar from "./Components/Sidebar";
+import { Box, Container } from "@mui/material";
 import { createAppTheme } from './theme';
+import { usePage } from "./usePage";
 
 interface UserInfoType {
   picture?: string;
@@ -14,6 +17,7 @@ interface UserInfoType {
 function App() {
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
   const theme = createAppTheme(prefersDarkMode);
+  const [page, navigate] = usePage();
 
   const [user, setUser] = useState<UserInfoType | null>(() => {
     const stored = localStorage.getItem("user");
@@ -51,11 +55,19 @@ function App() {
             setUser={handleSetUser}
             setAccessToken={handleSetAccessToken}
           />
-          <Container>
-            <main style={{ width: "100%", boxSizing: "border-box", marginTop: "80px", flex: 1 }}>
-              {user && accessToken && <Calendars accessToken={accessToken} setAccessToken={handleSetAccessToken} />}
-            </main>
-          </Container>
+          <Box sx={{ display: "flex", flex: 1 }}>
+            {user && accessToken && <Sidebar page={page} onNavigate={navigate} />}
+            <Container>
+              <main style={{ width: "100%", boxSizing: "border-box", marginTop: "80px", flex: 1 }}>
+                {user && accessToken && page === "calendar" && (
+                  <Calendars accessToken={accessToken} setAccessToken={handleSetAccessToken} />
+                )}
+                {user && accessToken && page === "commute" && (
+                  <Commute accessToken={accessToken} setAccessToken={handleSetAccessToken} />
+                )}
+              </main>
+            </Container>
+          </Box>
         </div>
       </ThemeProvider>
     </GoogleOAuthProvider>

@@ -33,7 +33,12 @@ const Header = ({ user, setUser, setAccessToken }: HeaderProps) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // Extract user name (try name, fallback to email, else unknown)
-  const userName = user?.name || user?.email || "Unknown";
+  const userName =
+    typeof user?.name === "string"
+      ? user.name
+      : typeof user?.email === "string"
+        ? user.email
+        : "Unknown";
 
   // useGoogleLogin for implicit flow
   const login = useGoogleAuth({ setUser, setAccessToken });
@@ -57,9 +62,11 @@ const Header = ({ user, setUser, setAccessToken }: HeaderProps) => {
   return (
     <AppBar 
       position="fixed" 
-      sx={{ 
+      sx={{
         bgcolor: 'teal',
-        boxShadow: 1
+        boxShadow: 1,
+        // Stay above the sidebar
+        zIndex: (theme) => theme.zIndex.drawer + 1
       }}
     >
       <Toolbar>
@@ -104,12 +111,13 @@ const Header = ({ user, setUser, setAccessToken }: HeaderProps) => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               {!isMobile && (
                 <Typography variant="body1" color="black">
-                  {`Ingelogd als ${userName}`}
+                  {userName}
                 </Typography>
               )}
               <Avatar
-                src={user.picture as string}
+                src={user.picture}
                 alt="User"
+                slotProps={{ img: { referrerPolicy: "no-referrer" } }}
                 onClick={handleMenuClick}
                 sx={{ 
                   cursor: 'pointer',
@@ -131,6 +139,7 @@ const Header = ({ user, setUser, setAccessToken }: HeaderProps) => {
                 }}
               >
                 <MenuItem onClick={handleLogout}>Log out</MenuItem>
+
               </Menu>
             </Box>
           )}
