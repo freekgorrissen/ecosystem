@@ -11,11 +11,6 @@ const calendarAlerts: CalendarAlert[] = [
     message: "Blaf en Blij is vandaag gesloten"
   },
   {
-    keyword: "Maya kinderdagverblijf",
-    severity: "info",
-    message: "Maya gaat vandaag naar Onder de Boompjes 🌳"
-  },
-  {
     keyword: "Birthday",
     severity: "success",
     message: "🥳 Er is vandaag een jarige! 🥳"
